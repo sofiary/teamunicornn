@@ -1,2 +1,5 @@
 /input/*
 /.idea/*
+/.ipynb_checkpoints/*
+.env
+.scripts
