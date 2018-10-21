@@ -1,1 +1,1 @@
-Use Fastai conda env for this folder
+Use Fastai conda env for this folder.
