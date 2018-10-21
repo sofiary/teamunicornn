@@ -14,6 +14,7 @@ Notebooks are numbered according to stages of work
 **Clustering**
 
 * 3_0_clustering_ds.ipynb
+* 3_0_a_clustering_tsne_ds.ipynb
 * 3_1_clustering_kNN_ds.ipynb
 
 **Forecasting**
