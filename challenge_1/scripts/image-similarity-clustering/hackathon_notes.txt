@@ -1,0 +1,12 @@
+created a third env - a virtualenv with requirements as per the requirements.txt file.
+
+tf_clustering_py36
+
+images were saved to images in path below then the following commands were ran:
+
+python extract.py /mnt/wd_gold_2tb/Data/ML_Data/comps/temp/clustering_image_df.csv
+
+python tsne.py /mnt/wd_gold_2tb/Data/ML_Data/comps/temp/clustering_image_df_features.tsv
+
+
+
