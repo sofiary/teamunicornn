@@ -15,7 +15,7 @@ from keras.layers import Flatten
 from keras.layers.convolutional import Conv1D
 from keras.layers.convolutional import MaxPooling1D
 
-#set env to export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/
+# set env to export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/
 
 PATH='../input/merged_data/LCLid/clean/'
 MODEL_NAME = '4_5_a_mutichannel_cnn'

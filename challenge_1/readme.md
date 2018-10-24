@@ -16,4 +16,6 @@ Notebooks are numbered according to stages of work
 
 * 4
 
-See Results_and_Conclusions.ipynb for more detials
+See Results_and_Conclusions.ipynb for more details
+
+

@@ -21,7 +21,7 @@ PATH='../input/merged_data/LCLid/clean/'
 MODEL_NAME = '4_5_b_multihead_cnn'
 
 DAILY_SAMPLE_RATE=48
-#one week ahead
+# one week ahead
 FORECAST_DAYS=7
 TEST_WEEKS = 1
 TEST_SAMPLES=TEST_WEEKS*FORECAST_DAYS*DAILY_SAMPLE_RATE

@@ -28,7 +28,7 @@ import seaborn as sns; sns.set()
 PATH='../input/merged_data/LCLid/clean/'
 MODEL_NAME = '4_0_daily_baseline'
 
-#half hourly
+#half hourly data
 DAILY_SAMPLE_RATE = 48
 FORECAST_DAYS=7
 TEST_WEEKS = 1
