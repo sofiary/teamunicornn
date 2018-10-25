@@ -246,7 +246,7 @@ def run_forecast(dataset, mac_name, model_name):
 
     # split into train and test
     train, test = split_dataset(dataset.values)
-    # prepare the models to evaluate
+    #prepare the models to evaluate
     models = get_models()
 
     n_input = FORECAST_DAYS*DAILY_SAMPLE_RATE

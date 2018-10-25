@@ -226,7 +226,7 @@ def create_dataset(mac, data_col = ['energy(kWh/hh)'], train_cols=['temperature'
     dataset.set_index(['day_time'],inplace=True)
     #original data is to 3 decimal places
     dataset[data_col] = dataset[data_col].round(3)
-    #dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
+    # dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
 
     dataset = dataset[data_col + train_cols]
     print('df.isna().any(): {0}'.format(dataset.isna().any()))
