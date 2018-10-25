@@ -4,15 +4,17 @@
 '''Machne Learning Multi-step forecasts
 Forecasting 7 days ahead using half hourly dataset
 
-THis code could be optimize to use multiprocessing with ProcessPoolExecutor
+This code could be optimized to use multiprocessing with ProcessPoolExecutor
+Based on code by Brownlea at machinelearningmastrty.com
 '''
-
+import time
 import sys
 from math import sqrt
 from numpy import split
 from numpy import array
 import numpy as np
 import pandas as pd
+import pickle as pkl
 from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import StandardScaler
@@ -30,11 +32,8 @@ from sklearn.linear_model import RANSACRegressor
 from sklearn.linear_model import SGDRegressor
 
 
-sys.path.append("../scripts/")
-from forecast_utils import av_scores
-
-PATH='../input/merged_data/'
-MAC_NAME='mac000230'
+PATH='../input/merged_data/LCLid/'
+MODEL_NAME = '4_2_a_ml_direct'
 
 DAILY_SAMPLE_RATE=48
 #one week ahead
@@ -55,7 +54,6 @@ def split_dataset(data):
 
 # evaluate one or more weekly forecasts against expected values
 def evaluate_forecasts(actual, predicted):
-    print('>evaluate_forecasts()')
     scores = list()
     # calculate an RMSE score for each day
     for i in range(actual.shape[1]):
@@ -78,13 +76,12 @@ def print_scores(name, score, scores):
     #s_scores = ', '.join(['%.1f' % s for s in scores])
     #print('%s: [%.3f] %s' % ('Half hourly', score, s_scores))
     n_chunks = len(scores)/DAILY_SAMPLE_RATE
-    print(type(scores))
     scores_chunked = np.array_split(scores, n_chunks)
     av_scores = []
     for chunk in scores_chunked:
         av_scores.append(np.average(chunk))
     w_scores = ', '.join(['%.1f' % s for s in av_scores])
-    print('%s: [%.3f] %s' % (name, score, w_scores))
+    print('%s: rmse=[%.3f] %s' % (name, score, w_scores))
 
 def print_best_algo(name_score):
     best_alg = ''
@@ -110,7 +107,7 @@ def get_models(models=dict()):
     #models['lars'] = Lars()
     models['lasso lars'] = LassoLars()
     models['passive aggressive regressor'] = PassiveAggressiveRegressor(max_iter=1000, tol=1e-3)
-    models['ranscac regressor'] = RANSACRegressor(min_samples=7)
+    models['ranscac regressor'] = RANSACRegressor(min_samples=4)
     models['sgd regressor'] = SGDRegressor(max_iter=5000, tol=1e-3)
     print('Defined %d models' % len(models))
     return models
@@ -155,12 +152,17 @@ def sklearn_predict(model, history, data_column):
         # make pipeline
         pipeline = make_pipeline(model)
         # fit the model
-        pipeline.fit(train_x, train_y)
-        # forecast
-        x_input = array(train_x[-1, :]).reshape(1,FORECAST_DAYS*DAILY_SAMPLE_RATE)
-        yhat = pipeline.predict(x_input)[0]
-        # store
-        yhat_sequence.append(yhat)
+        try:
+            pipeline.fit(train_x, train_y)
+            # forecast
+            x_input = array(train_x[-1, :]).reshape(1,FORECAST_DAYS*DAILY_SAMPLE_RATE)
+            yhat = pipeline.predict(x_input)[0]
+            # store
+            yhat_sequence.append(yhat)
+        except ValueError as e:
+            #RANSAC can throw errors, lets continue with other models
+            print(e)
+            yhat_sequence.append(0.0)
     return yhat_sequence
 
 # evaluate a single model
@@ -183,8 +185,15 @@ def evaluate_model(model, train, test, data_column=0):
     score, scores = evaluate_forecasts(actuals, predictions)
     return score, scores, actuals, predictions
 
-def eval_model(name, model):
-    print('>eval_model() {0}'.format(name))
+def av_scores(scores, sample_rate=48):
+    n_chunks = len(scores) / sample_rate
+    scores_chunked = np.array_split(scores, n_chunks)
+    av_scores = []
+    for chunk in scores_chunked:
+        av_scores.append(np.mean(chunk))
+    return av_scores
+
+def eval_model(name, model, train, test):
     # evaluate and get scores, energy(kWh/hh) is the first column in our dataset
     score, scores, actuals, predictions = evaluate_model(model, train, test, data_column=0)
     # summarize scores
@@ -193,78 +202,97 @@ def eval_model(name, model):
     # plot scores
     return av, actuals, predictions
 
-# ### Read in data
-dateparse = lambda x: pd.datetime.strptime(x, '%Y-%m-%d %H:%M:%S')
+def save_obj(obj, path, name ):
+    with open(path + name + '.pkl', 'wb') as f:
+        pkl.dump(obj, f, pkl.HIGHEST_PROTOCOL)
 
-dataset = pd.read_csv('{0}LCLid/clean_{1}.csv'.format(PATH, MAC_NAME), parse_dates=['day_time'], date_parser=dateparse)
+def load_obj(path, name ):
+    with open(path + name + '.pkl', 'rb') as f:
+        return pkl.load(f)
 
-#subsample for testing
-#dataset = dataset[-1*(4*DAILY_SAMPLE_RATE*FORECAST_DAYS):]
+def save_eval_pkl(av, scores, name):
+    save_obj(av, '../results/', 'forecast_averages_{0}'.format(name))
+    save_obj(scores, '../results/', 'forecast_scores_{0}'.format(name))
 
-dataset.set_index(['day_time'],inplace=True)
-#original data is to 3 decimal places
-dataset['energy(kWh/hh)'] = dataset['energy(kWh/hh)'].round(3)
-dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
+def create_dataset(mac, data_col = ['energy(kWh/hh)'], train_cols=['temperature', 'humidity'], folder='clean/'):
+    # ### Read in data
+    dateparse = lambda x: pd.datetime.strptime(x, '%Y-%m-%d %H:%M:%S')
 
-dataset =  dataset[['energy(Wh/hh)', 'temperature', 'humidity']]
-dataset=dataset.fillna(0)
+    dataset = pd.read_csv('{0}{1}{2}.csv'.format(PATH, folder, mac), parse_dates=['day_time'], date_parser=dateparse)
 
-ts = dataset['energy(Wh/hh)'].values
-ds = dataset.index.values
+    #subsample for testing
+    dataset = dataset[-1*(4*DAILY_SAMPLE_RATE*FORECAST_DAYS):]
 
-plt.plot(ds, ts)
-plt.show(block=False)
-plt.close()
+    dataset.set_index(['day_time'],inplace=True)
+    #original data is to 3 decimal places
+    dataset[data_col] = dataset[data_col].round(3)
+    #dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
 
-# split into train and test
-train, test = split_dataset(dataset.values)
-# prepare the models to evaluate
-models = get_models()
+    dataset = dataset[data_col + train_cols]
+    print('df.isna().any(): {0}'.format(dataset.isna().any()))
+    dataset=dataset.fillna(0)
+    return dataset
 
-days = ['sun', 'mon', 'tue', 'wed', 'thr', 'fri', 'sat']
-score_list = []
+def run_forecast(dataset, mac_name, model_name):
+    # split into train and test
+    train, test = split_dataset(dataset.values)
+    # prepare the models to evaluate
+    models = get_models()
+
+    days = ['sun', 'mon', 'tue', 'wed', 'thr', 'fri', 'sat']
+    score_list = []
+
+    avs=[]
+    actuals=[]
+    predictions=[]
+    names=[]
+    for name, model in models.items():
+        av, actual, prediction = eval_model(name, model,train, test)
+        names.append(name)
+        avs.append(av)
+        score_list.append((name, av))
+        predictions.append(prediction)
+        actuals.append(actual)
+
+    for name, av in zip(names, avs):
+        plt.plot(days, av, marker='o', label=name)
+        plt.ylabel('RSWE Wh')
+    # show plot
+    plt.legend()
+    plt.savefig('plots/{0}_{1}'.format(model_name, mac_name))
+    plt.show(block=False)
+    plt.close()
+    best_alg = print_best_algo(score_list)
+    return names, actuals, predictions, models
+
+def plot_forecasts(mac_name, model_name, names, actuals, predictions, models):
+    i=0
+    hh=range(FORECAST_DAYS*DAILY_SAMPLE_RATE)
+    for name, actual, pred in zip(names, actuals, predictions):
+        plt.subplot(len(models.items()), 1, i+1)
+        actual=actual.flatten()
+        plt.plot(hh, actual, label='actual', color='k')
+        prediction = pred.flatten()
+        plt.plot(hh, prediction,  label='predicted', color='r')
+        plt.title(name, fontsize=10)
+        plt.ylabel('Wh/hh')
+        i+=1
+
+    plt.legend()
+    plt.savefig('plots/{0}_{1}_{2}_day_forecast_actuals.png'.format(MODEL_NAME, mac_name, FORECAST_DAYS))
+    plt.show(block=False)
 
 
-avs=[]
-actuals=[]
-predictions=[]
-names=[]
-for name, model in models.items():
-    av, actual, prediction = eval_model(name, model)
-    names.append(name)
-    avs.append(av)
-    score_list.append((name, av))
-    predictions.append(prediction)
-    actuals.append(actual)
+def workflow(maclist = ['mac000230','mac000100'], data_col = ['energy(kWh/hh)'], train_cols=['temperature', 'humidity'], folder='clean/'):
+    start = time.time()
+    for mac in maclist:
+        dataset = create_dataset(mac,data_col, train_cols, folder=folder)
+        names, actuals, predictions, models = run_forecast(dataset, mac, MODEL_NAME)
+        plot_forecasts(mac, MODEL_NAME, names, actuals, predictions, models)
+    end = time.time()
+    elapsed = end - start
+    print('<<workflow() for {0} macs took {1} secs'.format(len(maclist), elapsed))
 
-for name, av in zip(names, avs):
-    plt.scatter(days, av, marker='o', label=name)
-    plt.ylabel('RSWE Wh')
-# show plot
-plt.legend()
-plt.savefig('plots/4_2_a_{0}_{1}_day_forecast_rmse.png'.format(MAC_NAME, FORECAST_DAYS))
-plt.show(block=False)
+if __name__ == "__main__":
+    workflow()
 
-i=0
-hh=range(FORECAST_DAYS*DAILY_SAMPLE_RATE)
-for name, actual, pred in zip(names, actuals, predictions):
-    plt.subplot(len(models.items()), 1, i+1)
-    actual=actual.flatten()
-    plt.plot(hh, actual, label='actual', color='k')
-    prediction = pred.flatten()
-    plt.plot(hh, prediction,  label='predicted', color='r')
-    plt.title(name, fontsize=10)
-    plt.ylabel('Wh/hh')
-    i+=1
-
-plt.legend()
-plt.savefig('plots/4_2_a_{0}_{1}_day_forecast_actuals.png'.format(MAC_NAME, FORECAST_DAYS))
-plt.show(block=False)
-
-
-
-best_alg = print_best_algo(score_list)
-
-# Display history and forecasts on same plot
-
-# Run models on daily dataset

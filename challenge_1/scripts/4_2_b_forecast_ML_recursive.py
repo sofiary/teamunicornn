@@ -1,7 +1,9 @@
 # recursive multi-step forecast with linear algorithms
+import time
 import sys
 from math import sqrt
 import numpy as np
+import pickle as pkl
 import pandas as pd
 from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
@@ -19,11 +21,8 @@ from sklearn.linear_model import PassiveAggressiveRegressor
 from sklearn.linear_model import RANSACRegressor
 from sklearn.linear_model import SGDRegressor
 
-sys.path.append("../scripts/")
-from forecast_utils import av_scores
-
-PATH='../input/merged_data/'
-MAC_NAME='mac000230'
+PATH='../input/merged_data/LCLid/clean/'
+MODEL_NAME = '4_2_b_ml_recursive'
 
 DAILY_SAMPLE_RATE=48
 #one week ahead
@@ -62,13 +61,11 @@ def evaluate_forecasts(actual, predicted):
     score = sqrt(s / (actual.shape[0] * actual.shape[1]))
     return score, scores
 
-
 # summarize scores
 def print_scores(name, score, scores):
     #s_scores = ', '.join(['%.1f' % s for s in scores])
     #print('%s: [%.3f] %s' % ('Half hourly', score, s_scores))
     n_chunks = len(scores)/DAILY_SAMPLE_RATE
-    print(type(scores))
     scores_chunked = np.array_split(scores, n_chunks)
     av_scores = []
     for chunk in scores_chunked:
@@ -184,7 +181,6 @@ def evaluate_model(model, train, test, n_input, data_column=0):
     history = [x for x in train]
     # walk-forward validation over each week
     predictions = list()
-    print('len(test): {0}'.format(len(test)))
     for i in range(len(test)):
         # predict the week
         yhat_sequence = sklearn_predict(model, history, n_input)
@@ -198,8 +194,15 @@ def evaluate_model(model, train, test, n_input, data_column=0):
     score, scores = evaluate_forecasts(actuals, predictions)
     return score, scores, actuals, predictions
 
+def av_scores(scores, sample_rate=48):
+    n_chunks = len(scores) / sample_rate
+    scores_chunked = np.array_split(scores, n_chunks)
+    av_scores = []
+    for chunk in scores_chunked:
+        av_scores.append(np.mean(chunk))
+    return av_scores
+
 def eval_model(name, model, train, test, n_input, data_column=0):
-    print('>eval_model() {0}'.format(name))
     # evaluate and get scores, energy(kWh/hh) is the first column in our dataset
     score, scores, actuals, predictions = evaluate_model(model, train, test, n_input, data_column)
     # summarize scores
@@ -208,78 +211,102 @@ def eval_model(name, model, train, test, n_input, data_column=0):
     # plot scores
     return av, actuals, predictions
 
-# ### Read in data
-dateparse = lambda x: pd.datetime.strptime(x, '%Y-%m-%d %H:%M:%S')
+def create_dataset(mac, data_col = ['energy(kWh/hh)'], train_cols=['temperature', 'humidity']):
+    # ### Read in data
+    dateparse = lambda x: pd.datetime.strptime(x, '%Y-%m-%d %H:%M:%S')
 
-dataset = pd.read_csv('{0}LCLid/clean_{1}.csv'.format(PATH, MAC_NAME), parse_dates=['day_time'], date_parser=dateparse)
+    dataset = pd.read_csv('{0}{1}.csv'.format(PATH, mac), parse_dates=['day_time'], date_parser=dateparse)
 
-#subsample for testing
-dataset = dataset[-1*(4*DAILY_SAMPLE_RATE*FORECAST_DAYS):]
+    #subsample for testing
+    #dataset = dataset[-1*(4*DAILY_SAMPLE_RATE*FORECAST_DAYS):]
 
-dataset.set_index(['day_time'],inplace=True)
-#original data is to 3 decimal places
-dataset['energy(kWh/hh)'] = dataset['energy(kWh/hh)'].round(3)
-dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
+    dataset.set_index(['day_time'],inplace=True)
+    #original data is to 3 decimal places
+    dataset[data_col] = dataset[data_col].round(3)
+    #dataset['energy(Wh/hh)'] = dataset['energy(kWh/hh)'].multiply(1000)
 
-dataset =  dataset[['energy(Wh/hh)', 'temperature', 'humidity']]
-dataset=dataset.fillna(0)
+    dataset = dataset[data_col + train_cols]
+    dataset=dataset.fillna(0)
+    return dataset
 
-#plot the dataset
-ts = dataset['energy(Wh/hh)'].values
-ds = dataset.index.values
+def save_obj(obj, path, name ):
+    with open(path + name + '.pkl', 'wb') as f:
+        pkl.dump(obj, f, pkl.HIGHEST_PROTOCOL)
 
-#plt.plot(ds, ts)
-#plt.show(block=False)
+def load_obj(path, name ):
+    with open(path + name + '.pkl', 'rb') as f:
+        return pkl.load(f)
 
-# split into train and test
-train, test = split_dataset(dataset.values)
-# prepare the models to evaluate
-models = get_models()
-
-n_input = FORECAST_DAYS*DAILY_SAMPLE_RATE
-# evaluate each model
-days = ['sun', 'mon', 'tue', 'wed', 'thr', 'fri', 'sat']
-avs=[]
-actuals=[]
-predictions=[]
-names=[]
-score_list = []
-for name, model in models.items():
-    # evaluate and get scores
-    av, actual, prediction = eval_model(name, model, train, test, n_input, data_column=0)
-    names.append(name)
-    avs.append(av)
-    score_list.append((name, av))
-    predictions.append(prediction)
-    actuals.append(actual)
-
-for name, av in zip(names, avs):
-    plt.plot(days, av, marker='o', label=name)
-    plt.ylabel('RSWE Wh')
-# show plot
-plt.legend()
-plt.savefig('plots/4_2_b_{0}_{1}_day_forecast_rmse.png'.format(MAC_NAME, FORECAST_DAYS))
-plt.show()
-
-plt.show(block=False)
-plt.close()
-
-i=0
-hh=range(FORECAST_DAYS*DAILY_SAMPLE_RATE)
-for name, actual, pred in zip(names, actuals, predictions):
-    plt.subplot(len(models.items()), 1, i+1)
-    actual=actual.flatten()
-    plt.plot(hh, actual, label='actual', color='k')
-    prediction = pred.flatten()
-    plt.plot(hh, prediction,  label='predicted', color='r')
-    plt.title(name, fontsize=10)
-    plt.ylabel('Wh/hh')
-    i+=1
-
-plt.legend()
-plt.savefig('plots/4_2_b_{0}_{1}_day_forecast_actuals.png'.format(MAC_NAME, FORECAST_DAYS))
-plt.show()
+def save_eval_pkl(av, scores, name):
+    save_obj(av, '../results/', 'forecast_averages_{0}'.format(name))
+    save_obj(scores, '../results/', 'forecast_scores_{0}'.format(name))
 
 
+def run_forecast(dataset, mac_name, model_name):
 
-best_alg = print_best_algo(score_list)
+    # split into train and test
+    train, test = split_dataset(dataset.values)
+    # prepare the models to evaluate
+    models = get_models()
+
+    n_input = FORECAST_DAYS*DAILY_SAMPLE_RATE
+    # evaluate each model
+    days = ['sun', 'mon', 'tue', 'wed', 'thr', 'fri', 'sat']
+    avs=[]
+    actuals=[]
+    predictions=[]
+    names=[]
+    score_list = []
+    for name, model in models.items():
+        # evaluate and get scores
+        av, actual, prediction = eval_model(name, model, train, test, n_input, data_column=0)
+        names.append(name)
+        avs.append(av)
+        score_list.append((name, av))
+        predictions.append(prediction)
+        actuals.append(actual)
+
+    for name, av in zip(names, avs):
+        plt.plot(days, av, marker='o', label=name)
+        plt.ylabel('RSWE Wh')
+    # show plot
+    plt.legend()
+    #plt.savefig('plots/4_2_b_{0}_{1}_day_forecast_rmse.png'.format(mac, FORECAST_DAYS))
+    name_fig = 'plots/{0}_{1}'.format(model_name, mac_name)
+    plt.savefig(name_fig)
+    plt.show(block=False)
+    plt.close()
+    best_alg = print_best_algo(score_list)
+    return names, actuals, predictions, models
+
+def plot_forecasts(names, actuals, predictions, models, mac):
+    i=0
+    hh=range(FORECAST_DAYS*DAILY_SAMPLE_RATE)
+    for name, actual, pred in zip(names, actuals, predictions):
+        plt.subplot(len(models.items()), 1, i+1)
+        actual=actual.flatten()
+        plt.plot(hh, actual, label='actual', color='k')
+        prediction = pred.flatten()
+        plt.plot(hh, prediction,  label='predicted', color='r')
+        plt.title(name, fontsize=10)
+        plt.ylabel('Wh/hh')
+        i+=1
+
+    plt.legend()
+    plt.savefig('plots/{0}_{1}_{2}_day_forecast_actuals.png'.format(MODEL_NAME, mac, FORECAST_DAYS))
+    plt.show(block=False)
+
+
+def workflow(maclist = ['mac000230', 'mac000100'], data_col = ['energy(kWh/hh)'], train_cols=['temperature', 'humidity']):
+    start = time.time()
+    for mac in maclist:
+        dataset = None
+        dataset = create_dataset(mac, data_col, train_cols)
+        names, actuals, predictions, models=run_forecast(dataset, mac, MODEL_NAME)
+        plot_forecasts(names, actuals, predictions, models, mac)
+    end = time.time()
+    elapsed = end - start
+    print('<<workflow() for {0} macs took {1} secs'.format(len(maclist), elapsed))
+
+if __name__ == "__main__":
+    workflow()
