@@ -18,7 +18,7 @@ PATH='../input/merged_data/LCLid/clean/'
 
 MODEL_NAME = '4_7_mutivariate_enc_dec_lstm'
 DAILY_SAMPLE_RATE=48
-#one week ahead
+# one week ahead
 FORECAST_DAYS=7
 TEST_WEEKS = 1
 TEST_SAMPLES=TEST_WEEKS*FORECAST_DAYS*DAILY_SAMPLE_RATE

@@ -220,7 +220,7 @@ def create_dataset(mac, data_col = ['energy(kWh/hh)'], train_cols=['temperature'
 
     dataset = pd.read_csv('{0}{1}{2}.csv'.format(PATH, folder, mac), parse_dates=['day_time'], date_parser=dateparse)
 
-    #subsample for testing
+    # subsample for testing
     dataset = dataset[-1*(4*DAILY_SAMPLE_RATE*FORECAST_DAYS):]
 
     dataset.set_index(['day_time'],inplace=True)
