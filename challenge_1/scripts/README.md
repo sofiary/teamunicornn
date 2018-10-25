@@ -1,0 +1,1 @@
+Scripts in this folder use sklearn, tensorflow 1.9 and keras. See tf_env.txt for requirements
