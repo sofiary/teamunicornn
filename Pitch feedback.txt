@@ -1,0 +1,43 @@
+1. Tell them what youre going to tell them
+2. Tell them what you justy said youre going to tell them
+3. Tell them again, what you just told them
+
+General Note:
+- Dont let highlights be buried - emphasise them
+
+FeedbackL:
+- Keep it high level for audience
+- What value can it add?
+- Technical assessments have already been done - dont have to convince audience
+
+Slide 9 - rethink
+1 - obvious
+2,3 - too technical
+4 - good
+
+Slide 15 - Make it clearer
+- What was provided? Imagery only. Make this clear.
+
+Slide 16 - Reorder plots by year
+
+Slide 17 - do not use graphs
+- Show 400x400 standard 
+- Show outliers (larger) - What do these mean to the model>?
+
+Slide 20 - anticipated qn
+- What is the median? 
+
+Slide 25 - talk to it more
+- We tried to improve generalisation and accuracy - prevent overfitting
+- What did we do ( at a high level )
+What is the message/point?
+
+Slide 8 - merge
+Consider merging point 1 and 3 wiuth slide 9 to make a concise point
+
+Slide 20/21 merge
+
+slide 17 option - consider removing
+
+Consider MORE images
+Input - Process - Output - VALUE?
