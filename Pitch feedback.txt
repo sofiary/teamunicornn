@@ -1,11 +1,11 @@
 1. Tell them what youre going to tell them
-2. Tell them what you justy said youre going to tell them
+2. Tell them what you just said youre going to tell them
 3. Tell them again, what you just told them
 
 General Note:
 - Dont let highlights be buried - emphasise them
 
-FeedbackL:
+Feedback:
 - Keep it high level for audience
 - What value can it add?
 - Technical assessments have already been done - dont have to convince audience
