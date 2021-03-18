@@ -14,7 +14,7 @@ mkl-fft
 mkl-random
 numpy==1.14.2
 pandas==0.22.0
-Pillow==5.1.0
+Pillow==8.1.1
 protobuf==3.5.2.post1
 pyreadline==2.1
 python-dateutil==2.7.2
